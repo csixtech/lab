@@ -1,0 +1,258 @@
+---
+title: "Logistic Regression"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Variable considered for product distribution	
+
+FEATURES      | DESCRIPTION                                   | POSSIBLE ANSWERS   
+------------- | --------------------------------------------- | --------------------
+CLIENTE       | client code                                   | [code]           
+STATUS        | type of points                                | [turismo; outros]
+RENDA         | income                                        | [number]  
+ESCOL         | education                                     | [5 to 14]
+RESID         | type of residence                             | [1 to 3]
+SEXO          | gender                                        | [0 and 1]
+
+Enabling libraries and packages: <br>
+```{r pacotes, message=FALSE, warning=FALSE}
+# install.packages("caret") 
+# install.packages("dplyr") 
+# install.packages("ggplot2") 
+# install.packages("grid") 
+# install.packages("gridExtra") 
+# install.packages("gtools") # necessary to run gmodels
+# install.packages("gmodels") 
+# install.packages("magrittr") 
+# install.packages("partykit") 
+# install.packages("rattle")
+# install.packages("RColorBrewer")
+# install.packages("ODBC")
+# install.packages("rpart")
+# install.packages("rpart.plot")
+# install.packages("UsingR")
+# install.packages("readxl")
+
+library(caret) 
+library(dplyr)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+library(gtools) # necessary to run gmodels
+library(gmodels)
+library(magrittr)
+library(partykit)
+library(rattle)
+library(RColorBrewer) 
+library(RODBC)
+library(rpart) 
+library(rpart.plot)
+library(UsingR)
+library(readxl)
+```
+
+<br>
+Load dataset punto.xlsx anb visualize structure:
+```{r}
+punto <- read_excel("E:/Google Drive/Fgv/Modelagem Preditiva - Abraham Laredo/R/Punto.xlsx")
+str(punto)
+# preserve original Punto datase; create PP
+pp=punto
+```
+
+<br>
+Define variable is not numeric but factor:
+```{r}
+pp$RESID=as.factor(pp$RESID)
+pp$SEXO=as.factor(pp$SEXO)
+```
+
+<br>
+A more elegant table format; analysing variable RESID
+```{r}
+m = table(pp$RESID, pp$STATUS) #pre analyse results
+mp = prop.table(m,1)
+m;mp
+# feature 3 has a higher concentrarion in "tourism"
+# we could merge feature 1 and 2 because percentages are close
+# some authrs say we cannot work with categories with 5% or less - not true
+# 200-300 is reasonable
+# advantage of merging features you have less variable and dummies to handle
+# logistic regression btw. 0.7087379 and 0.7128028 - in neural networks we try to reduce
+# group coefficients 1 and 2 should be similar
+```
+
+<br>
+Same assessment as above: analysing variable SEX
+```{r}
+m = table(pp$SEXO, pp$STATUS) #pre analise dos resultados
+mp = prop.table(m,1)
+m;mp
+# difference is also not that big: .71 e .73 are very close to each other
+# what is big? depends on analyst
+# if sample is too small (10 guys), the feature is not worth it (too small) 
+# discretize (ranges) to work better
+```
+
+<br>
+Let's analyse income and discretize in order to analyse "linearity"
+```{r}
+# install.packages("arules")
+library(arules)
+#k refers to category
+#divide variable krenda in 5 intervals - (200 ppl per inteval in a 1000 ppl sample)
+pp$krenda=discretize(pp$RENDA, method = "frequency", categories =5) #using counting type = frequency
+```
+
+<br>
+Same assessment as above: analysing variable RENDA
+```{r}
+m = table(pp$krenda, pp$STATUS) #pre-assessing results
+mp = prop.table(m,1)
+m;mp
+#sum of outros + turismo close o 200 - variation of +1 is due to ties 
+#seeting turismo column, more income you have, your preference towards tourism increases
+#use discretized feature/variable
+```
+
+
+<br>
+Same assessment as above: analysing variable ESCOL
+```{r}
+m = table(pp$ESCOL,pp$STATUS) #pre analise dos resultados
+mp = prop.table(m,1)
+m;mp
+# linearity problem - using escolatirity ranges
+```
+
+<br>
+Running Logistic Regression
+```{r}
+# feature crated with binomial status
+pp$alvo=ifelse(pp$STATUS=="turismo",1,0)
+
+```
+
+
+Using caret
+```{r}
+# use caret to separate sample
+
+
+```
+
+
+Alternative to caret: manual method in case caret does not work
+
+```{r}
+# first. define seed
+set.seed(1934)
+# user 1000 observations; use 500, with no repetitions
+flag=sample(1:1000,500,replace=FALSE) 
+ppl = pp[flag,] #generate learning sample
+ppt = pp[-flag,] #generate test sample
+
+```
+
+
+```{r}
+# glm - linear model - no excel
+# run glm with learning sample ppl
+fit=glm(data = ppl, alvo~RENDA+ESCOL+RESID+SEXO, family = binomial())
+```
+
+
+<BR>
+Analyse results
+```{r}
+summary(fit)
+
+# set it up "z" equation, observing column estimate z = -12.30 + 0.0051*Renda + 0.52*Escol...
+  # z is linear equation to calculate probability
+  # for instance, let's say we found a equation of z of 3.2
+  # P(Tur) = 1 / (1+ exp^-3.2)
+
+# data that was not included is part of the intercep
+# the # of the estimate does not indicate relevance - income is higher then education (which varies from 1 to 14)
+# you can eventually remove the less relevant items; the remaining features will be re-balanced
+# **** akaiki index - # of variables vs. predictive quality ***
+# to select variables, generate new model
+
+```
+
+<BR>
+Changing threshhold and running model again
+```{r}
+fit2=step(fit)
+summary(fit2)
+
+# test probabilities to discovery is machine has done a good job
+# finding probability of tourism
+# run model with test sample, finding individuals interested in tourism
+
+```
+
+
+
+
+<BR>
+Changing threshhold and running again
+```{r}
+ppt$ptur = predict(fit2, newdata=ppt, type = "response") # we use "response" with decision trees
+#verify adjuste of the model
+#when the sample is relatively small, run crossvalidation
+#we will find probability ptur
+
+```
+
+<BR>
+Changing threshhold and running again
+```{r}
+ppt$klas=ifelse(ppt$ptur>.7,"tur_hat","out_hat")
+m=table(ppt$klas,ppt$STATUS)
+m
+# calculate global error = (44 + 60) / 500 = 20.8%
+# consider costs - classification costs - of calculating an individual to be interest in tourism when he/she is not, or the other way around
+# work with intervals/ranges to find ks
+
+```
+
+<BR>
+Running hmeasure
+```{r}
+## install.packages("hmeasure")
+library(hmeasure)
+HMeasure(ppt$STATUS,ppt$ptur)$metrics
+# ks = 0.5095
+# mudar o ponto de corte para 0.7
+```
+
+
+<br>
+Run ROC Curve
+```{r}
+ppt$klas=ifelse(ppt$ptur>.7,"tur_hat","out_hat")
+m=table(ppt$klas,ppt$STATUS)
+m
+# calculate global error = (44 + 60) / 500 = 20.8%
+# consider costs - classification costs - of calculating an individual to be interest in tourism when he/she is not, or the other way around
+```
+
+
+
+<br>
+Run ROC Curve
+```{r}
+#install.packages("pROC")
+library(pROC)
+xx=roc(ppt$STATUS,ppt$ptur)
+plot(xx)
+# over 0.9
+# tendency to use h
+# whoever created h, has no idea what is good h or bad h
+```
+
